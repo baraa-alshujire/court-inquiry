@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>نظام استعلام مواعيد المرافعات</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#f0f2f5;color:#1a1a1a;direction:rtl;min-height:100vh}
+.container{max-width:680px;margin:0 auto;padding:24px 16px}
+.hdr{background:linear-gradient(135deg,#1a3a5c,#0d2640);color:#fff;border-radius:14px;padding:24px;margin-bottom:20px;text-align:center;box-shadow:0 4px 20px rgba(26,58,92,.3)}
+.hdr h1{font-size:22px;font-weight:700;margin-bottom:6px;letter-spacing:.5px}
+.hdr p{font-size:13px;opacity:.8}
+.card{background:#fff;border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.07)}
+.search-row{display:flex;gap:8px;margin-bottom:8px}
+.search-row input{flex:1;padding:13px 16px;border:1.5px solid #ddd;border-radius:10px;font-size:15px;font-family:inherit;background:#fff;color:#1a1a1a;transition:border .2s}
+.search-row input:focus{outline:none;border-color:#1a3a5c;box-shadow:0 0 0 3px rgba(26,58,92,.1)}
+.btn{padding:13px 22px;border-radius:10px;border:none;background:#1a3a5c;color:#fff;font-size:14px;cursor:pointer;font-family:inherit;white-space:nowrap;font-weight:600;transition:background .2s}
+.btn:hover{background:#0d2640}
+.hint{font-size:12px;color:#999;margin-bottom:4px;padding-right:2px}
+.loading{text-align:center;padding:40px;color:#888}
+.spin{display:inline-block;width:32px;height:32px;border:3px solid #e0e0e0;border-top-color:#1a3a5c;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err-box{background:#fff3f3;border:1px solid #ffcdd2;border-radius:10px;padding:14px 16px;color:#c62828;font-size:13px;margin-bottom:12px}
+.res-card{background:#fff;border:1.5px solid #e8eaf0;border-radius:14px;padding:18px 20px;margin-bottom:12px;transition:box-shadow .2s}
+.res-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.1)}
+.res-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.case-no{font-size:17px;font-weight:700;color:#1a3a5c}
+.badge{font-size:11px;padding:5px 12px;border-radius:20px;font-weight:700;white-space:nowrap}
+.b-today{background:#fff3e0;color:#e65100;border:1.5px solid #ffb74d}
+.b-up{background:#e8f5e9;color:#2e7d32;border:1.5px solid #81c784}
+.b-past{background:#f5f5f5;color:#757575;border:1.5px solid #e0e0e0}
+.b-none{background:#f5f5f5;color:#757575;border:1.5px solid #e0e0e0}
+.sep{border:none;border-top:1.5px solid #f0f2f5;margin:12px 0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+@media(max-width:480px){.grid2{grid-template-columns:1fr}}
+.fi .fl{font-size:11px;color:#999;margin-bottom:3px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.fi .fv{font-size:14px;color:#1a1a1a;font-weight:500}
+.last-box{background:linear-gradient(135deg,#f8f9ff,#f0f2f5);border-radius:10px;padding:14px 16px;border:1px solid #e8eaf0}
+.last-row{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.last-left{flex:1;min-width:130px;direction:ltr;text-align:left}
+.last-right{flex:1;min-width:130px;direction:rtl;text-align:right}
+.lb-lbl{font-size:10px;color:#999;margin-bottom:4px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.lb-val{font-size:16px;font-weight:700;color:#1a3a5c}
+.lb-act{font-size:13px;color:#333;margin-top:3px;font-weight:500}
+.lb-type{display:inline-block;font-size:11px;padding:3px 10px;border-radius:12px;margin-top:6px;font-weight:700}
+.t-q{background:#e3f2fd;color:#1565c0}
+.t-r{background:#ede7f6;color:#4527a0}
+.t-d{background:#e8f5e9;color:#2e7d32}
+.t-c{background:#fff8e1;color:#f57f17}
+.t-x{background:#ffebee;color:#c62828}
+.t-o{background:#f5f5f5;color:#757575}
+.not-found{text-align:center;padding:40px 16px;color:#999}
+.nf-ico{font-size:44px;margin-bottom:14px}
+.nf-txt{font-size:15px;line-height:1.6}
+.footer{text-align:center;margin-top:20px;font-size:11px;color:#bbb;padding-bottom:20px}
+.status-bar{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:#999;margin-top:8px;padding:0 2px}
+.dot{width:8px;height:8px;border-radius:50%;background:#4caf50;display:inline-block;margin-left:5px}
+.dot.loading{background:#ff9800;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="hdr">
+    <h1>⚖️ نظام استعلام مواعيد المرافعات</h1>
+    <p>ابحث برقم الدعوى أو الاسم الثلاثي</p>
+  </div>
+
+  <div class="card">
+    <div class="search-row">
+      <input type="text" id="sq" placeholder="رقم الدعوى أو الاسم الثلاثي كاملاً..." oninput="onInput()" onkeydown="if(event.key==='Enter')doSearch()" disabled>
+      <button class="btn" id="searchBtn" onclick="doSearch()" disabled>بحث</button>
+    </div>
+    <div class="hint" id="hintTxt">جارٍ تحميل البيانات...</div>
+    <div id="res"></div>
+    <div class="status-bar">
+      <span><span class="dot loading" id="statusDot"></span><span id="statusTxt">جارٍ الاتصال...</span></span>
+      <span id="countTxt"></span>
+    </div>
+  </div>
+
+  <div class="footer">نظام استعلام مواعيد المرافعات — البيانات تُحدَّث تلقائياً</div>
+</div>
+
+<script>
+// ── إعدادات ────────────────────────────────────────────────
+const SHEET_ID = '1O4CHYJCmX4A9K6UDLwolQ_BCq2ez5GmlFa7kscJWqlU';
+const SHEET_NAME = 'الورقة1'; // اسم الورقة في ملفك
+const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
+
+let cases = [];
+
+// ── تحميل البيانات ─────────────────────────────────────────
+async function loadData() {
+  setStatus('loading', 'جارٍ تحميل البيانات...');
+  try {
+    const res = await fetch(CSV_URL);
+    if (!res.ok) throw new Error('فشل الاتصال');
+    const text = await res.text();
+    parseCSV(text);
+    setStatus('ok', 'البيانات محدّثة');
+    document.getElementById('sq').disabled = false;
+    document.getElementById('searchBtn').disabled = false;
+    document.getElementById('hintTxt').textContent = 'للبحث بالاسم: اكتب الاسم الثلاثي كاملاً';
+    document.getElementById('sq').focus();
+  } catch(e) {
+    setStatus('err', 'تعذّر تحميل البيانات — تأكد من الاتصال');
+    document.getElementById('hintTxt').textContent = 'خطأ في تحميل البيانات';
+  }
+}
+
+function setStatus(type, msg) {
+  const dot = document.getElementById('statusDot');
+  dot.className = 'dot' + (type === 'loading' ? ' loading' : '');
+  dot.style.background = type === 'ok' ? '#4caf50' : type === 'err' ? '#f44336' : '#ff9800';
+  document.getElementById('statusTxt').textContent = msg;
+}
+
+// ── تحليل CSV ──────────────────────────────────────────────
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return;
+
+  // تحليل السطر الأول كأعمدة
+  const headers = parseCSVLine(lines[0]);
+
+  // كشف الأعمدة
+  const find = (terms) => {
+    for (const t of terms) {
+      const i = headers.findIndex(h => h.replace(/\s/g,'').includes(t));
+      if (i >= 0) return i;
+    }
+    return -1;
+  };
+
+  const numI  = find(['رقمالدعوى','رقم_الدعوى','رقم']);
+  const pltI  = find(['اسمالمدعي','المدعي','مدعي']);
+  const defI  = find(['اسمالمدعىعليه','المدعىعليه','عليه','المدعىعليه']);
+
+  // أعمدة المرافعات — كل عمود اسمه يحتوي "مرافعة"
+  const arabicNum = {'١':1,'٢':2,'٣':3,'٤':4,'٥':5,'٦':6,'٧':7,'٨':8,'٩':9};
+  const hearingIdxs = headers
+    .map((h,i) => ({h,i}))
+    .filter(x => /مرافعة|مرافعه/.test(x.h))
+    .sort((a,b) => {
+      const getN = s => {
+        const m = s.match(/([١٢٣٤٥٦٧٨٩])/) || s.match(/(\d+)/);
+        if (!m) return 0;
+        return arabicNum[m[1]] !== undefined ? arabicNum[m[1]] : +m[1];
+      };
+      return getN(a.h) - getN(b.h);
+    })
+    .map(x => x.i);
+
+  const hearingNames = hearingIdxs.map(i => headers[i]);
+
+  const map = {}, order = [];
+  for (let r = 1; r < lines.length; r++) {
+    const cols = parseCSVLine(lines[r]);
+    if (!cols.length) continue;
+    const id = (cols[numI] || '').trim();
+    if (!id) continue;
+    if (!map[id]) {
+      order.push(id);
+      map[id] = {
+        id,
+        plaintiff: (cols[pltI] || '—').trim(),
+        defendant: (cols[defI] || '—').trim(),
+        vals: hearingIdxs.map(i => (cols[i] || '').trim())
+      };
+    } else {
+      // تحديث بالسطر الأخير
+      map[id].vals = hearingIdxs.map(i => (cols[i] || '').trim());
+    }
+  }
+
+  cases = order.map(id => {
+    const c = map[id];
+    const vals = c.vals;
+
+    // آخر قيمة غير فارغة من اليسار
+    let lastRaw = '', lastColName = '';
+    for (let i = vals.length - 1; i >= 0; i--) {
+      if (vals[i]) { lastRaw = vals[i]; lastColName = hearingNames[i] || ''; break; }
+    }
+
+    let displayAction = '', displayDate = null;
+    if (isActionText(lastRaw)) {
+      displayAction = lastRaw;
+      for (let i = vals.length - 1; i >= 0; i--) {
+        if (!isActionText(vals[i])) {
+          const d = parseDate(vals[i]);
+          if (d) { displayDate = d; break; }
+        }
+      }
+    } else {
+      displayDate = parseDate(lastRaw);
+    }
+
+    return { id: c.id, plaintiff: c.plaintiff, defendant: c.defendant,
+             lastDate: displayDate, lastDateStr: fmtDate(displayDate),
+             lastAction: displayAction, lastColName };
+  });
+
+  document.getElementById('countTxt').textContent = cases.length + ' دعوى';
+}
+
+// ── تحليل سطر CSV مع دعم الاقتباسات ──────────────────────
+function parseCSVLine(line) {
+  const result = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if (ch === ',' && !inQ) {
+      result.push(cur.trim()); cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+// ── كشف نص الإجراء ────────────────────────────────────────
+const ACTION_RE = /قرار|حكم|مراجع|إبطال|ابطال|ابطل|إحالة|احالة|تأجيل|رد|فصل/;
+function isActionText(v) { return v && ACTION_RE.test(String(v)); }
+
+// ── تحويل تاريخ ───────────────────────────────────────────
+function parseDate(v) {
+  if (!v || isActionText(v)) return null;
+  const s = String(v).trim();
+  if (!s || s === '—') return null;
+
+  // Excel serial
+  if (/^\d{5}$/.test(s)) {
+    const n = +s;
+    if (n > 30000 && n < 60000) {
+      const epoch = new Date(Date.UTC(1899,11,30));
+      const d = new Date(epoch.getTime() + n * 86400000);
+      return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12));
+    }
+  }
+  // yyyy-mm-dd
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) return new Date(Date.UTC(+iso[1], +iso[2]-1, +iso[3], 12));
+  // dd/mm/yyyy
+  const dmy = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+  if (dmy) { let y=+dmy[3]; if(y<100)y+=2000; return new Date(Date.UTC(y,+dmy[2]-1,+dmy[1],12)); }
+  // Monday- 03/17
+  const eng = s.match(/(\d{1,2})[\/\-](\d{1,2})$/);
+  if (eng) {
+    const year = new Date().getFullYear();
+    const m = +eng[1], d = +eng[2];
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31)
+      return new Date(Date.UTC(year, m-1, d, 12));
+  }
+  return null;
+}
+
+function fmtDate(d) {
+  if (!d) return null;
+  return d.toLocaleDateString('ar-IQ', {timeZone:'UTC', day:'numeric', month:'numeric', year:'numeric'});
+}
+function todayUTC() { const n=new Date(); return new Date(Date.UTC(n.getFullYear(),n.getMonth(),n.getDate(),12)); }
+function isToday(d) { return d && d.toDateString() === todayUTC().toDateString(); }
+function isUp(d) { return d && d > todayUTC() && !isToday(d); }
+function isPast(d) { return d && d < todayUTC() && !isToday(d); }
+
+function detectType(txt) {
+  if (!txt) return null;
+  if (/قرار|حكم|فصل/.test(txt)) return {label:'قرار', cls:'t-d'};
+  if (/مراجع/.test(txt)) return {label:'مراجعة', cls:'t-r'};
+  if (/إبطال|ابطال|ابطل/.test(txt)) return {label:'إبطال', cls:'t-x'};
+  if (/إحالة|احالة/.test(txt)) return {label:'إحالة', cls:'t-c'};
+  if (/مرافع|جلسة/.test(txt)) return {label:'مرافعة', cls:'t-q'};
+  return {label:'إجراء', cls:'t-o'};
+}
+
+// ── البحث ─────────────────────────────────────────────────
+function normSearch(s) {
+  return String(s||'').trim().toLowerCase()
+    .replace(/\s+/g,' ').replace(/[أإآا]/g,'ا').replace(/[ةه]/g,'ه').replace(/ى/g,'ي');
+}
+function matchCase(c, q) {
+  const qn = normSearch(q), idN = normSearch(c.id);
+  // إذا كتب المستخدم سنة فقط (4 أرقام مثل 2026) بدون / → لا تعطي نتيجة
+  const isYearOnly = /^\d{3,4}$/.test(q.trim());
+  if (!isYearOnly) {
+    if (idN === qn) return true;
+    if (idN.startsWith(qn)) { const nx=idN[qn.length]; if(!nx||nx==='/'||nx==='-'||nx===' ')return true; }
+  }
+  // بحث بالاسم: يجب الاسم الثلاثي كاملاً (3 كلمات)
+  const words = qn.split(' ').filter(w=>w.length>0);
+  if (words.length >= 3) {
+    const pN=normSearch(c.plaintiff), dN=normSearch(c.defendant);
+    if (pN===qn||dN===qn||pN.startsWith(qn)||dN.startsWith(qn)) return true;
+  }
+  return false;
+}
+
+let timer = null;
+function onInput() {
+  clearTimeout(timer);
+  const q = document.getElementById('sq').value.trim();
+  if (!q) { document.getElementById('res').innerHTML=''; document.getElementById('hintTxt').textContent='للبحث بالاسم: اكتب الاسم الثلاثي كاملاً'; return; }
+  const words = q.trim().split(/\s+/).filter(w=>w);
+  if (words.length===1 && isNaN(q.replace('/','').replace('-',''))) {
+    document.getElementById('hintTxt').textContent='البحث بالاسم يتطلب الاسم الثلاثي كاملاً (٣ كلمات)';
+  } else if (words.length===2) {
+    document.getElementById('hintTxt').textContent='أضف الاسم الثالث للبحث بالاسم';
+  } else {
+    document.getElementById('hintTxt').textContent='';
+  }
+  timer = setTimeout(()=>doSearch(), 300);
+}
+
+function doSearch() {
+  const q = document.getElementById('sq').value.trim();
+  if (!q || !cases.length) return;
+  render(cases.filter(c=>matchCase(c,q)), q);
+}
+
+function render(list, q) {
+  const area = document.getElementById('res');
+  if (!list.length) {
+    const words = q.trim().split(/\s+/).filter(w=>w);
+    const hint = words.length<3 && isNaN(q.replace('/','')) ? '<br><small>تذكير: البحث بالاسم يتطلب الاسم الثلاثي كاملاً</small>' : '';
+    area.innerHTML = `<div class="not-found"><div class="nf-ico">🔍</div><div class="nf-txt">لا توجد دعوى مطابقة لـ "<strong>${q}</strong>"${hint}</div></div>`;
+    return;
+  }
+  area.innerHTML = list.map(c => {
+    const tod=isToday(c.lastDate), up=isUp(c.lastDate), past=isPast(c.lastDate);
+    const badgeCls = tod?'b-today':up?'b-up':past?'b-past':'b-none';
+    const badgeTxt = tod?'موعد اليوم':up?'موعد قادم':past?'جلسة سابقة':'—';
+    const tp = c.lastAction ? detectType(c.lastAction) : c.lastDate ? {label:'موعد مرافعة',cls:'t-q'} : null;
+    return `<div class="res-card">
+  <div class="res-top">
+    <div class="case-no">دعوى رقم: ${c.id}</div>
+    <div class="badge ${badgeCls}">${badgeTxt}</div>
+  </div>
+  <div class="grid2">
+    <div class="fi"><div class="fl">المدعي</div><div class="fv">${c.plaintiff}</div></div>
+    <div class="fi"><div class="fl">المدعى عليه</div><div class="fv">${c.defendant}</div></div>
+  </div>
+  <hr class="sep">
+  <div class="last-box">
+    <div class="last-row">
+      <div class="last-left">
+        <div class="lb-lbl">آخر إجراء${c.lastColName?' ('+c.lastColName+')':''}</div>
+        <div class="lb-act">${c.lastAction||'موعد مرافعة'}</div>
+        ${tp?`<span class="lb-type ${tp.cls}">${tp.label}</span>`:''}
+      </div>
+      <div class="last-right">
+        <div class="lb-lbl">موعد آخر جلسة</div>
+        <div class="lb-val">${c.lastDateStr||'—'}</div>
+      </div>
+    </div>
+  </div>
+</div>`;
+  }).join('');
+}
+
+// ── تشغيل ─────────────────────────────────────────────────
+loadData();
+// تحديث تلقائي كل 5 دقائق
+setInterval(loadData, 5 * 60 * 1000);
+</script>
+</body>
+</html>
